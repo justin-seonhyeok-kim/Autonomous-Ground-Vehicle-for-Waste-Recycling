@@ -4,7 +4,7 @@ from robomaster import robot, camera
 import sys
 import time
 
-# Initialize the variables (All members)
+# Initialize the variables
 distance = []
 angle = 270 # Starting angle
 coordx = 0
@@ -14,13 +14,13 @@ searching = True
 running = True
 confidence_score = 0.3 # Confidence score threshold, to prevent wrong detections
 
-# Load the YOLOv5 model (All members)
+# Load the YOLOv5 model
 sys.path.insert(0, './yolov5')
-model_path = r'C:\Users\angus\PycharmProjects\RoboMaster-SDK-master\yolov5\realfinalbest.pt' #final model
-model_path2 = r'C:\Users\angus\PycharmProjects\RoboMaster-SDK-master\yolov5'
+model_path = r'.\yolov5\realfinalbest.pt' #Final model
+model_path2 = r'.\yolov5'
 model = torch.hub.load(model_path2, 'custom', path=model_path, source='local')
 
-# Connect and initialize the robot (All members)
+# Connect and initialize the robot
 rm = robot.Robot()
 rm.initialize(conn_type="ap")
 arm = rm.robotic_arm
@@ -28,35 +28,35 @@ chassis = rm.chassis
 sensor = rm.sensor
 gripper = rm.gripper
 
-# Open the gripper (All members)
+# Open the gripper
 gripper.open(power=200)
 
-# Define the class labels for the recyclable garbages (All members)
-class_labels = ['paper', 'metal', 'plastic','finish'] #when the class label is 'finished', all garbages are picked up
+# Define the class labels for the recyclable garbages
+class_labels = ['paper', 'metal', 'plastic','finish'] # When the class label is 'finished', all garbages are picked up
 current_index = 0
 
-# IR sensor (All members)
+# IR sensor
 def sub_data_handler(sub_info):
     global distance
     distance = sub_info
 
-# Robomaster coordinate system (All members)
+# Robomaster coordinate system
 def sub_position_handler(position_info):
     global angle, coordx, coordy
     coordx, coordy, z = position_info
 
-# Calculate the center of the yolo rectangle (All members)
+# Calculate the center of the yolo rectangle
 def center(max, min):
     return (int(max)+int(min))/2
 
-# Main loop to capture images and detect objects (All members)
+# Main loop to capture images and detect objects
 rm.camera.start_video_stream(display=True, resolution=camera.STREAM_360P)
 
-# Call the IR sensor and coordinate system funtcion (runs parallel with the while loop) (All members)
-sensor.sub_distance(freq=1, callback=sub_data_handler) # Lower frequecny seems to make the code smoother
-chassis.sub_position(freq=1, callback=sub_position_handler) # Lower frequecny seems to make the code smoother
+# Call the IR sensor and coordinate system funtcion (runs parallel with the while loop)
+sensor.sub_distance(freq=1, callback=sub_data_handler) # Lower frequency seems to make the code smoother
+chassis.sub_position(freq=1, callback=sub_position_handler) # Lower frequency seems to make the code smoother
 
-# Initial position and orientation (All members)
+# Initial position and orientation
 chassis.move(x=0.2, y=0, z=0, xy_speed=0.3).wait_for_completed()
 chassis.move(x=0, y=0, z=90, z_speed=45).wait_for_completed()
 
@@ -66,7 +66,7 @@ while running:
     # Searching mode (1st step)
     if searching:
 
-        # Initialize the rotation counter (Chan Angus)
+        # Initialize the rotation counter
         rotatetime = 0
         rotatez = 30
         print('searching')
@@ -75,7 +75,7 @@ while running:
         # Rotate while searching
         while search_rotate:
 
-            # Rotated 180 degree and cannot find the selected garbages, it means that all garbages of the specific class are picked up and we can move on to the next garbage
+            # If rotated 180 degrees and cannot find the selected garbages, it means that all garbages of the specific class are picked up and can move on to the next garbage
             if rotatetime == 6:
                 current_index += 1
                 rotatetime = 0
@@ -87,7 +87,7 @@ while running:
                 running=False
                 break
 
-            # Capture an image from the camera (Hui Lap Pong)
+            # Capture an image from the camera
             image = rm.camera.read_cv2_image()
             image = cv2.resize(image, (640, 480))
 
@@ -106,7 +106,7 @@ while running:
                     grabbing = True
                     search_rotate = False
 
-            # Rotate 30 degree everytime during searching mode
+            # Rotate 30 degrees everytime during searching mode
             if searching:
                 chassis.move(x=0, y=0, z=-rotatez, z_speed=45).wait_for_completed()
                 rotatetime += 1
@@ -118,7 +118,7 @@ while running:
             elif angle < 0:
                 angle += 360
 
-    # Grabbing mode (2nd step) (Seonhyeok)
+    # Grabbing mode (2nd step)
     while grabbing:
 
         # Capture an image from the camera
@@ -137,28 +137,28 @@ while running:
                 if detection['name'] in [class_labels[current_index]] and detection['confidence'] >= confidence_score:
                     center_x, center_y = center(detection['xmax'], detection['xmin']), center(detection['ymax'], detection['ymin'])
 
-                    # The garbage is on the left side on the center of the screen, the robot will move left to center the garbage
+                    # If the garbage is on the left side of the center of the screen, the robot will move left to center the garbage
                     if center_x <= 317:
                         print('moving left')
                         chassis.drive_speed(x=0, y=-0.05, z=0, timeout=1)
 
-                    # The garbage is on the right side on the center of the screen, the robot will move right to center the garbage
+                    # If the garbage is on the right side of the center of the screen, the robot will move right to center the garbage
                     elif center_x >= 322:
                         print('moving right')
                         chassis.drive_speed(x=0, y=0.05, z=0, timeout=1)
 
-                    # The garbage is located at the center of the screen, the robot can move forward to grab the garbage
+                    # If the garbage is located at the center of the screen, the robot can move forward to grab the garbage
                     elif center_x > 317 and center_x < 322:
 
-                        # Move forward a bit first, so that the robot can still grab the garbage if it is too close
+                        # Move forward a bit first, so that the robot can still grab the garbage even if it is too close
                         print('going forward...')
                         chassis.drive_speed(x=0.15, y=0, z=0, timeout=1)
                         time.sleep(1)
 
-                        # Moving towards the garbage (Chan Angus)
+                        # Moving towards the garbage
                         while True:
 
-                            # Keep moving forward if the robot have not reached the garbage
+                            # Keep moving forward if the robot has not reached the garbage
                             chassis.drive_speed(x=0.15, y=0, z=0, timeout=1)
 
                             # Reached the garbage
@@ -175,7 +175,7 @@ while running:
                                 tempx, tempy = coordx, coordy # Record the coordinates of the robot
                                 print(tempx, tempy)
 
-                                # Grab the garbages to specific locations (Hui Chung Hin)
+                                # Grab the garbages to specific locations 
                                 if current_index == 2:
                                     chassis.move(x=0, y=0, z=-(90-angle), z_speed=90).wait_for_completed() # Points towards the plastic zone
                                     angle = 180
@@ -192,7 +192,7 @@ while running:
                                     print('moving' + str(1+tempy))
                                     chassis.move(x=1 + tempy, y=0, z=0, xy_speed=0.7).wait_for_completed()  # Moves to the paper zone
 
-                                time.sleep(2) #(Seonhyeok)
+                                time.sleep(2)
                                 arm.move(x=0, y=-90).wait_for_completed() # Lower the gripper
                                 print('lowering')
                                 gripper.open(power=300) # Open the gripper
@@ -200,7 +200,7 @@ while running:
                                 time.sleep(1)
                                 gripper.pause()
                                 chassis.move(x=-0.2, y=0, z=0, xy_speed=0.1).wait_for_completed() # Move backwards
-                                chassis.move(x=0, y=0, z=-90, z_speed=90).wait_for_completed()  # rotate to search position
+                                chassis.move(x=0, y=0, z=-90, z_speed=90).wait_for_completed()  # Rotate to search position
                                 print('moving out')
 
                                 # Goes back to searching mode
